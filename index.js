@@ -16,10 +16,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const allowed = process.env.ALLOWED_ORIGIN || '*';
+app.use(cors({ origin: allowed }));
+app.use(express.json());
+
 //Boot route
 app.get("/", (req, res) => {
   res.send("Hotel backend running 🚀");
 });
+
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // API route prefixes
 app.use('/api/users', userRoutes);
