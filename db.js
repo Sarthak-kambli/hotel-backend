@@ -4,6 +4,11 @@ require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+
+  ssl: {
+    rejectUnauthorized: false, // required for Render PostgreSQL
+  },
+
   /* If running locally without DATABASE_URL, you can configure:
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
