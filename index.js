@@ -1,3 +1,4 @@
+
 //index.js - main entry
 require("dotenv").config();
 const express = require("express");
@@ -13,8 +14,6 @@ const billRoutes = require('./routes/bill');
 const paymentRoutes = require('./routes/payment');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
 const allowed = process.env.ALLOWED_ORIGIN || '*';
 app.use(cors({ origin: allowed }));
@@ -41,6 +40,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
 //Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(5000, () => console.log('Server running on http://localhost:${PORT}'));
+app.listen(PORT, () => console.log('Server running on http://localhost:${PORT}'));
