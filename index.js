@@ -9,9 +9,7 @@ const userRoutes = require('./routes/users');
 const tableRoutes = require('./routes/tables');
 const menuRoutes = require('./routes/menu');
 const bookingRoutes = require('./routes/booking');
-const orderRoutes = require('./routes/order');
-const billRoutes = require('./routes/bill');
-const paymentRoutes = require('./routes/payment');
+
 
 const app = express();
 
@@ -31,9 +29,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/order', orderRoutes);
-app.use('/api/bill', billRoutes);
-app.use('/api/payment', paymentRoutes);
+
 
 // 404 handler
 app.use((req, res) => {
