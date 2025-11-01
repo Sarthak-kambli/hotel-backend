@@ -2,78 +2,119 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const authMiddleware = require('../middleware/authMiddleware');
 
-// POST /api/bookings - create a booking
-router.post('/', async (req, res) => {
-  const { name, phone, date, time, guests, table_id } = req.body;
+// Helper: Restrict certain routes to specific roles
+const requireRole = (role) => (req, res, next) => {
+  if (req.user.role !== role) {
+    return res.status(403).json({ message: 'Access denied: insufficient permissions' });
+  }
+  next();
+};
+
+/* 
+  POST /api/bookings
+  -> Logged-in users can make a booking request
+  -> Default status = 'pending'
+*/
+router.post('/', authMiddleware, async (req, res) => {
+  const { name, phone, date, time, guests } = req.body;
+
   try {
+    if (!name || !phone || !date || !time || !guests) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
     const result = await db.query(
-      'INSERT INTO bookings(name, phone, date, time, guests, table_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
-      [name, phone, date, time, guests, table_id]
+      `INSERT INTO bookings (name, phone, date, time, guests, status, user_id)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+       RETURNING *`,
+      [name, phone, date, time, guests, req.user.id]
     );
-    res.status(201).json(result.rows[0]);
+
+    res.status(201).json({
+      message: 'Booking request sent successfully. You will be notified once confirmed.',
+      booking: result.rows[0]
+    });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: 'Failed to book' });
+    res.status(500).json({ error: 'Failed to create booking' });
   }
 });
 
-// GET /api/bookings - list bookings (admin)
-router.get('/', async (req, res) => {
+/* 
+  GET /api/bookings
+  -> Admin only: view all bookings
+*/
+router.get('/', authMiddleware, requireRole('admin'), async (req, res) => {
   try {
     const result = await db.query('SELECT * FROM bookings ORDER BY date, time');
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: 'Failed to fetch bookings' });
+    res.status(500).json({ error: 'Failed to fetch bookings' });
   }
 });
 
-// GET /api/bookings/:id - get single booking
-router.get('/:id', async (req, res) => {
+/* 
+  PUT /api/bookings/:id/status
+  -> Admin only: approve or reject a booking
+  -> Expected body: { status: 'confirmed' | 'rejected' }
+*/
+router.put('/:id/status', authMiddleware, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
-  try {
-    const result = await db.query('SELECT * FROM bookings WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Booking not found' });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: 'Failed to fetch booking' });
-  }
-});
+  const { status } = req.body;
 
-// PUT /api/bookings/:id - update a booking
-router.put('/:id', async (req, res) => {
-  const { id } = req.params;
-  const { name, phone, date, time, guests, table_id } = req.body;
+  if (!['confirmed', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status value' });
+  }
+
   try {
     const result = await db.query(
-      `UPDATE bookings 
-       SET name = $1, phone = $2, date = $3, time = $4, guests = $5, table_id = $6 
-       WHERE id = $7 RETURNING *`,
-      [name, phone, date, time, guests, table_id, id]
+      `UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, id]
     );
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    res.json(result.rows[0]);
+
+    res.json({
+      message: `Booking ${status} successfully`,
+      booking: result.rows[0]
+    });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: 'Failed to update booking' });
+    res.status(500).json({ error: 'Failed to update booking status' });
   }
 });
 
-// DELETE /api/bookings/:id - delete a booking
-router.delete('/:id', async (req, res) => {
+/* 
+  GET /api/bookings/my
+  -> Logged-in user can view only their bookings
+*/
+router.get('/my', authMiddleware, async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM bookings WHERE user_id = $1 ORDER BY date, time',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch your bookings' });
+  }
+});
+
+// DELETE /api/bookings/:id - Admin only
+router.delete('/:id', authMiddleware, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await db.query('DELETE FROM bookings WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    res.json({ message: 'Booking deleted successfully' });
+    res.json({ message: 'Booking deleted successfully', deleted: result.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete booking' });

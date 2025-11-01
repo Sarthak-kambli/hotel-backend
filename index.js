@@ -6,7 +6,6 @@ const cors = require('cors');
 
 //Import routes
 const userRoutes = require('./routes/users');
-const tableRoutes = require('./routes/tables');
 const bookingRoutes = require('./routes/booking');
 
 
@@ -25,7 +24,6 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // API route prefixes
 app.use('/api/users', userRoutes);
-app.use('/api/tables', tableRoutes);
 app.use('/api/bookings', bookingRoutes);
 
 
